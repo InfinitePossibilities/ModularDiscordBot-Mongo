@@ -1,0 +1,11 @@
+{
+    "inputFiles": ["./src"],
+    "mode": "modules",
+    "exclude": [
+        "node_modules",
+        "confidential.ts",
+        "src/commands/templatecommand.ts",
+        "src/commands/testcopy.ts"
+    ],
+    "out": "doc"
+  }
