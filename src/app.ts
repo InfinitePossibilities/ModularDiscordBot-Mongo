@@ -1,4 +1,4 @@
-// Last modified: 2021/11/04 23:47:25
+// Last modified: 2021/11/06 09:32:18
 
 // APIs
 import * as Discord from "discord.js";
@@ -48,7 +48,7 @@ bot.on("ready", async() => {
             tableDefaults.main_settings[0]
         ]);
     }
-    indexFunctions.handleEvent(bot, "readyevent", events);
+    // indexFunctions.handleEvent(bot, "readyevent", events);
     return;
     // util.handleEvent(bot, "robloxevent", events, bloxyClient);
     // util.handleEvent(bot, "adminevent", events);
