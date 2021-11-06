@@ -4,6 +4,7 @@
     "exclude": [
         "node_modules",
         "confidential.ts",
+        ".env",
         "src/commands/templatecommand.ts",
         "src/commands/testcopy.ts"
     ],
