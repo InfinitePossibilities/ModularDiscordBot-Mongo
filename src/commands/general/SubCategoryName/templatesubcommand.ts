@@ -1,4 +1,4 @@
-import * as Discord from "discord.js";
+import * as Discord from 'discord.js';
 import { IBotCommand } from "../../../IBotAPIs";
 import { CommandType } from "../../../config";
 import { db, schemas } from "../../../database";
