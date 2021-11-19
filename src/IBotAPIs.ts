@@ -14,6 +14,7 @@ export interface IBotEvent {
 export interface IBotCommand {
     info: {
         command: () => string;
+        aliases: () => string[] | [];
         description: () => string;
         syntax: () => string;
         arguments: () => string[] | [] | undefined;
@@ -22,4 +23,10 @@ export interface IBotCommand {
         Type: () => CommandType;
     }
     runCommand(args: string[], msgObject: Discord.Message, bot: Discord.Client): Promise<void>;
+}
+
+export interface IBotDB {
+    isGuildDB(): boolean;
+    isManual(): boolean;
+    queryDB(guild?: Discord.Guild): Promise<void>;
 }

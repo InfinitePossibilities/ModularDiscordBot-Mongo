@@ -1,4 +1,4 @@
-import * as Discord from "discord.js";
+import { Message, Client, MessageActionRow, MessageButton, ColorResolvable } from "discord.js";
 import { IBotCommand } from "../../IBotAPIs";
 import { CommandType } from "../../config";
 import { db, schemas } from "../../database";
@@ -9,6 +9,7 @@ import { commands } from "../../app";
 
 module.exports = class help implements IBotCommand {
     private readonly _command = "help";
+    private readonly _aliases = ["h"];
     private readonly _description = "Shows basic information and command syntax.";
     private readonly _syntax = "<command>";
     private readonly _arguments = ["list"];
@@ -17,6 +18,7 @@ module.exports = class help implements IBotCommand {
 
     info = {
         command: (): string => { return this._command },
+        aliases: () => { return this._aliases },
         description: (): string => { return this._description },
         syntax: (): string => { return this._syntax },
         arguments: () => { return this._arguments },
@@ -24,7 +26,7 @@ module.exports = class help implements IBotCommand {
         Type: (): CommandType => { return this._Type }
     }
 
-    runCommand = async (args: string[], msgObject: Discord.Message, client: Discord.Client): Promise<void> => {
+    runCommand = async (args: string[], msgObject: Message, client: Client): Promise<void> => {
 
         // Do not ocntinue if message author is a bot.
         if (msgObject.author.bot) return;
@@ -43,7 +45,7 @@ module.exports = class help implements IBotCommand {
     }
 }
 
-let sendHelpList = async (_client: Discord.Client, _msgObject: Discord.Message) => {
+let sendHelpList = async (_client: Client, _msgObject: Message) => {
     if (!_msgObject.guild?.available) return;
 
     let _help = require("./help");
@@ -115,14 +117,14 @@ let sendHelpList = async (_client: Discord.Client, _msgObject: Discord.Message) 
         }
     }
 
-    const helpButtonRow = new Discord.MessageActionRow().addComponents(
-        new Discord.MessageButton()
+    const helpButtonRow = new MessageActionRow().addComponents(
+        new MessageButton()
             .setLabel('Discord')
             .setURL('https://discord.gg/VYp9qprv2u')
             .setStyle('LINK'),
     )
     const helpEmbed = {
-        color: (await _guildSettings.readRecords(undefined, "maincolor"))[0].maincolor as Discord.ColorResolvable,
+        color: (await _guildSettings.readRecords(undefined, "maincolor"))[0].maincolor as ColorResolvable,
         title: '**Commands**',
         description: _title+(_generalCommands ? (_generalTitle+_generalCommands) + "\n" : "")+(_utilityCommands ? (_utilityTitle+_utilityCommands) + "\n" : "")+(_developerCommands ? (_developerTitle+_developerCommands) + "\n" : ""),
         timestamp: new Date(),
@@ -134,8 +136,8 @@ let sendHelpList = async (_client: Discord.Client, _msgObject: Discord.Message) 
     _msgObject.channel.send({embeds: [helpEmbed], components: [helpButtonRow]});
 }
 
-let sendCommandHelp = async (_client: Discord.Client, _msgObject: Discord.Message, args: string[], type: string) => {
-    let _commandClass = commands.find((command) => { return command.info.command() == args[0].toLowerCase() })
+let sendCommandHelp = async (_client: Client, _msgObject: Message, args: string[], type: string) => {
+    let _commandClass = commands.find((command) => { return command.info.command() == args[0].toLowerCase() });
     
     let sendCommandEmbed = async (_commandClass: IBotCommand) => {
         if (!_msgObject.guild?.available || type == "undefined") return;
@@ -145,13 +147,14 @@ let sendCommandHelp = async (_client: Discord.Client, _msgObject: Discord.Messag
     
         let _command = `\`Command: ${_commandClass.info.command().charAt(0).toUpperCase()+_commandClass.info.command().slice(1)}\`\n`;
         let _usage = `\`Usage: ${_guildPrefix + _commandClass.info.command() + " " + _commandClass.info.syntax()}\`\n`;
+        let _aliases = (_commandClass.info.aliases().length as number > 0) ? `\`Aliases: ${(_commandClass.info.aliases() as string[]).sort().join(", ")}\`\n` : ""
         let _args = _commandClass.info.arguments() ? ((_commandClass.info.arguments()?.length as number > 0) ? `\`Arguments: ${(_commandClass.info.arguments() as string[]).sort().join(", ")}\`\n` : "") : ""
         let _description = _commandClass.info.description();
     
         const commandEmbed = {
-            color: (await _guildSettings.readRecords(undefined, "maincolor"))[0].maincolor as Discord.ColorResolvable,
+            color: (await _guildSettings.readRecords(undefined, "maincolor"))[0].maincolor as ColorResolvable,
             title: `**Command Information**`,
-            description: _command+_usage+_args+"\n"+_description,
+            description: _command+_aliases+_usage+_args+"\n"+_description,
             timestamp: new Date(),
             footer: {
                 text: _client.user?.username,
@@ -162,13 +165,23 @@ let sendCommandHelp = async (_client: Discord.Client, _msgObject: Discord.Messag
         _msgObject.channel.send({ embeds: [commandEmbed] });
     }
 
+    const errorButtonRow = new MessageActionRow().addComponents(
+        new MessageButton()
+            .setLabel('Discord')
+            .setURL('https://discord.gg/VYp9qprv2u')
+            .setStyle('LINK'),
+        new MessageButton()
+            .setCustomId('error')
+            .setLabel('Error (WIP)')
+            .setStyle('DANGER')
+    )
     let sendErrorEmbed = async () => {
-        if (!_msgObject.guild?.available || type == "undefined") return;
+        if (!_msgObject.guild?.available) return;
 
         const errorEmbed = {
-            color: [255,0,0] as Discord.ColorResolvable,
+            color: [255,0,0] as ColorResolvable,
             title: 'Error',
-            description: `Tis' an error! \n\nPlease report any unfixable errors below.`,
+            description: `No command with the specified name or alias exists! \n\nPlease report any unfixable errors below.`,
             timestamp: new Date(),
             footer: {
                 text: _client.user?.username,
@@ -176,7 +189,7 @@ let sendCommandHelp = async (_client: Discord.Client, _msgObject: Discord.Messag
             },
         };
     
-        _msgObject.channel.send({ embeds: [errorEmbed] });
+        _msgObject.channel.send({ embeds: [errorEmbed], components: [errorButtonRow] });
     }
     
     _commandClass

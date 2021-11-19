@@ -9,6 +9,7 @@ import { commands } from "../../../app";
 
 module.exports = class moosic implements IBotCommand {
     private readonly _command = "moosic";
+    private readonly _aliases = [];
     private readonly _description = "Cool Moosic command. Does cool stuff.";
     private readonly _syntax = "<extra>";
     private readonly _isTest = false;
@@ -18,6 +19,7 @@ module.exports = class moosic implements IBotCommand {
 
     info = {
         command: (): string => { return this._command },
+        aliases: () => { return this._aliases },
         description: (): string => { return this._description },
         syntax: (): string => { return this._syntax },
         arguments: () => { return this._arguments },

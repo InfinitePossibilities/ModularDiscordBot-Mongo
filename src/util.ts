@@ -4,7 +4,7 @@ import { db, schemas } from "./database";
 import { Schema, Model, model, models, connect, connection } from 'mongoose';
 
 // Event APIs
-import { IBotCommand, IBotEvent } from "./IBotAPIs";
+import { IBotCommand, IBotEvent, IBotDB } from "./IBotAPIs";
 import axios from "axios";
 import { bloxyClient } from "./app";
 //
@@ -212,6 +212,24 @@ export namespace indexFunctions {
             if ((await _globalRunning && await _localRunning) || _command == 'toggle') {
                 //Loop through all of our loaded commands
                 for (const _commandClass of _commands) {
+                    let _aliasExists = false;
+                    for (const _commandAlias of _commandClass.info.aliases()) {
+                        //Attempt to execute code but keep running incase of error
+                        try {
+                            // Check if issues command matches defined aliases in commandClass
+                            if (!(_commandAlias === _command)) continue;
+
+                            await _commandClass.runCommand(_args, _msg, _bot).catch((e) => { console.log(e); _msg.channel.send("There was an error running that command! Please notify your local developer!"); })
+                            _aliasExists = true;
+                            break;
+                        }
+                        catch (exception) {
+                            //If there is an error, log error exception for debug
+                            console.log(exception);
+                        }
+                    }
+
+                    if (_aliasExists) break;
 
                     //Attempt to execute code but keep running incase of error
                     try {
@@ -220,6 +238,7 @@ export namespace indexFunctions {
                         if (!(_commandClass.info.command() === _command)) continue;
 
                         await _commandClass.runCommand(_args, _msg, _bot).catch((e) => { console.log(e); _msg.channel.send("There was an error running that command! Please notify your local developer!"); });
+                        break;
                     }
                     catch (exception) {
                         //If there is an error, log error exception for debug
@@ -318,7 +337,133 @@ export namespace indexFunctions {
     }
 
     export namespace events {
+        /**
+         * Run Events passed by the application.
+         * @param event Name of event to run.
+         * @param extra Extra variables to pass into event scope.
+         * @returns void
+         */
+        export async function handleEvent(bot: Discord.Client, event: string, events: IBotEvent[], extra?: any) {
+            // Loop through all events
+            for (const eventClass of events) {
+                try {
+                    // Check if event class is correct event
+                    if (!(eventClass.info.event() === event)) continue;
 
+                    await eventClass.runEvent(bot, extra).catch((e) => { console.log(e) });
+                }
+                catch(exception) {
+                    // If there is an error, log exception
+                    console.log(exception);
+                }
+            }
+        }
+
+        /**
+         * Load Events into Memory
+         * @param eventsPath Path to folder containing events.
+         * @returns void
+         */
+        export function loadEvents(eventsPath: string, events: IBotEvent[]) {
+            const fs = require('fs');
+
+            // Get a list of all events inside eventsFolder
+            fs.readdir(eventsPath, (err: any, files: any) => {
+                // For each file in eventsFolder, add to events variable
+                files.forEach((eventName: any) => {
+                    const eventsClass = require(`${eventsPath}/${miscFunctions.functions.replaceAll(eventName, ".js", "")}`)
+
+                    const event = new eventsClass() as IBotEvent;
+
+                    events.push(event);
+                });
+            })
+        }
+    }
+
+    export namespace dbs {
+        /**
+         * Push DBs into Arraylist from path.
+         * @param _dbsPath Path to folder containing DBs.
+         * @param _dbs Array list of DBs.
+         * @returns void
+         */
+        export function loadDBs(_dbsPath: string, _dbs: IBotDB[]) {
+            //Loop through all of the commands in the config file
+            const fs = require('fs');
+            const dbsFolder = _dbsPath;
+
+            // Get a list of all commands inside commandsFolder
+            fs.readdir(dbsFolder, (err: any, files: any) => {
+                // For each file in commandsFolder, add to commands variable
+                if (!files) return;
+                files.forEach((fileName: any) => {
+                    const filePath = `${_dbsPath}/${fileName}`;
+                    if (fs.lstatSync(filePath).isDirectory()) { indexFunctions.dbs.loadDBs(filePath, _dbs); return; }
+                    
+                    const dbsClass = require(`${_dbsPath}/${miscFunctions.functions.replaceAll(fileName, ".js", "")}`)
+
+                    const command = new dbsClass() as IBotDB;
+
+                    _dbs.push(command);
+                });
+            })
+        }
+
+        /**
+         * Run all DB queries.
+         * @param _commands Array list of loaded dbs.
+         * @returns void
+         */
+        export async function queryAllDBs(_dbs: IBotDB[]) {
+
+            //Loop through all of our loaded dbs
+            for (const _dbClass of _dbs) {
+
+                //Attempt to execute code but keep running incase of error
+                try {
+                    
+                    // Check if command class is correct command
+                    if (_dbClass.isGuildDB() || _dbClass.isManual()) continue;
+
+                    await _dbClass.queryDB().catch((e) => { console.log(e); });
+                    continue;
+                }
+                catch (exception) {
+                    //If there is an error, log error exception for debug
+                    console.log(exception);
+                }
+            }
+        }
+
+        /**
+         * Run one DB query
+         * @param _dbs Array list of loaded dbs.
+         * @param _dbName Unique name of db to query.
+         * @returns void
+         */
+        export async function queryOneDB(_dbs: IBotDB[], _dbName: string, _guild?: Discord.Guild) {
+            //Loop through all of our loaded dbs
+            for (const _dbClass of _dbs) {
+
+                //Attempt to execute code but keep running incase of error
+                try {
+                    
+                    // Check if command class is correct command
+                    if (_guild) {
+                        await _dbClass.queryDB(_guild).catch((e) => { console.log(e); });
+                        break;
+                    }
+
+                    await _dbClass.queryDB().catch((e) => { console.log(e); });
+                    break;
+                }
+                catch (exception) {
+                    //If there is an error, log error exception for debug
+                    console.log(exception);
+                }
+            }
+        }
     }
 }
 
@@ -353,189 +498,6 @@ export namespace indexFunctions {
 //     }
 
 //     /**
-//      * Handle Elevated Command.
-//      * @param msg Message object.
-//      * @returns void
-//      */
-//     export async function handleElevatedCommand(bot: Discord.Client, elevated_commands: IBotCommand[], msg: Discord.Message) {
-//         //Split the string into the command and all of the args
-//         let prefix = String(await new GlobalSettings().readSetting('prefix'));
-//         //Regexpression
-//         const prefixRegex = new RegExp(`^(<@!?${bot.user?.id}>)\\s*`);
-//         const matchedPrefix = msg.content.match(prefixRegex) || [];
-
-//         //Setup variables
-//         let args = prefixRegex.test(msg.content) 
-//             ? msg.content.slice(matchedPrefix[0].toString().length).trim().split(" ").slice(1).slice(1)
-//             : msg.content.split(" ").slice(1);
-//         let command = prefixRegex.test(msg.content) 
-//             ? msg.content.slice(matchedPrefix[0].toString().length).slice(matchedPrefix[0].toString().length).trim().split(" ")[0].toLowerCase()
-//             : msg.content.split(" ")[0].replace(String((prefix+prefix)), "").toLowerCase();
-
-//         if (await new GlobalSettings().readSetting('running') == 'true' || command == 'toggle') {
-//             //Loop through all of our loaded commands
-//             for (const commandClass of elevated_commands) {
-
-//                 //Attempt to execute code but keep running incase of error
-//                 try {
-                    
-//                     // Check if command class is correct command
-//                     if (!(commandClass.info.command() === command)) continue;
-
-//                     await commandClass.runCommand(args, msg, bot, elevated_commands).catch((e) => { console.log(e); msg.channel.send("There was an error running that command! Please notify your local developer!"); });
-
-//                 }
-//                 catch (exception) {
-//                     //If there is an error, log error exception for debug
-//                     console.log(exception);
-//                 }
-//             }
-//         }
-//     }
-
-//     /**
-//      * Load Elevated Commands into Memory from path.
-//      * @param commandsPath Path to folder containing elevated commands.
-//      * @returns void
-//      */
-//     export function loadElevatedCommands(commandsPath: string, elevated_commands: IBotCommand[]) {
-//         //Loop through all of the commands in the config file
-//         const fs = require('fs');
-//         const commandsFolder = commandsPath;
-
-//         // Get a list of all commands inside commandsFolder
-//         fs.readdir(commandsFolder, (err: any, files: any) => {
-//             // For each file in commandsFolder, add to commands variable
-//             files.forEach((fileName: any) => {
-//                 // console.log(file);
-//                 const commandsClass = require(`${commandsPath}/${replaceAll(fileName, ".js", "")}`)
-
-//                 const command = new commandsClass() as IBotCommand;
-
-//                 elevated_commands.push(command);
-//             });
-//         })
-
-//         // for (const commandName of config.commands as String[])
-//     }
-
-//     /**
-//      * Handle nonElevated Command.
-//      * @param msg Message object
-//      * @returns void
-//      */
-//     export async function handleCommand(bot: Discord.Client, commands: IBotCommand[], msg: Discord.Message) {
-//         if (!msg.guild?.available) return;
-//         //Split the string into the command and all of the args
-//         let prefix = await new LocalSettings(msg.guild).readSetting('prefix');
-//         //Regexpression
-//         const prefixRegex = new RegExp(`^(<@!?${bot.user?.id}>)\\s*`);
-//         const matchedPrefix = msg.content.match(prefixRegex) || [];
-
-//         //Setup variables
-//         let args = prefixRegex.test(msg.content) 
-//             ? msg.content.slice(matchedPrefix[0].toString().length).trim().split(" ").slice(1)
-//             : msg.content.split(" ").slice(1);
-//         let command = prefixRegex.test(msg.content) 
-//             ? msg.content.slice(matchedPrefix[0].toString().length).trim().split(" ")[0].toLowerCase()
-//             : await msg.content.split(" ")[0].replace(String(await prefix), "").toLowerCase();
-
-//         let localRunning = String(await new LocalSettings(msg.guild).readSetting('running'));
-//         let globalRunning = String(await new GlobalSettings().readSetting('running'));
-
-//         if ((globalRunning == 'true' && localRunning == 'true') || command == 'toggle') {
-//             //Loop through all of our loaded commands
-//             for (const commandClass of commands) {
-
-//                 //Attempt to execute code but keep running incase of error
-//                 try {
-                    
-//                     // Check if command class is correct command
-//                     if (!(commandClass.info.command() === command)) continue;
-
-//                     await commandClass.runCommand(args, msg, bot, commands).catch((e) => { console.log(e); msg.channel.send("There was an error running that command! Please notify your local developer!"); });
-
-//                 }
-//                 catch (exception) {
-//                     //If there is an error, log error exception for debug
-//                     console.log(exception);
-//                 }
-//             }
-//         }
-//     }
-
-//     /**
-//      * Load nonElevated Commands into Memory from path.
-//      * @param commandsPath Path to folder containing commands.
-//      * @returns void
-//      */
-//     export function loadCommands(commandsPath: string, commands: IBotCommand[]) {
-//         //Loop through all of the commands in the config file
-//         const fs = require('fs');
-//         const commandsFolder = commandsPath;
-
-//         // Get a list of all commands inside commandsFolder
-//         fs.readdir(commandsFolder, (err: any, files: any) => {
-//             // For each file in commandsFolder, add to commands variable
-//             files.forEach((fileName: any) => {
-//                 const filePath = `${commandsPath}/${fileName}`;
-//                 if (fs.lstatSync(filePath).isDirectory()) { this.loadCommands(filePath, commands); return; }
-                
-//                 const commandsClass = require(`${commandsPath}/${replaceAll(fileName, ".js", "")}`)
-
-//                 const command = new commandsClass() as IBotCommand;
-
-//                 commands.push(command);
-//             });
-//         })
-
-//         // for (const commandName of config.commands as String[])
-//     }
-
-//     /**
-//      * Run Events passed by the application.
-//      * @param event Name of event to run.
-//      * @param extra Extra variables to pass into event scope.
-//      * @returns void
-//      */
-//     export async function handleEvent(bot: Discord.Client, event: string, events: IBotEvent[], extra?: any) {
-//         // Loop through all events
-//         for (const eventClass of events) {
-//             try {
-//                 // Check if event class is correct event
-//                 if (!(eventClass.info.event() === event)) continue;
-
-//                 await eventClass.runEvent(bot, extra).catch((e) => { console.log(e) });
-//             }
-//             catch(exception) {
-//                 // If there is an error, log exception
-//                 console.log(exception);
-//             }
-//         }
-//     }
-
-//     /**
-//      * Load Events into Memory
-//      * @param eventsPath Path to folder containing events.
-//      * @returns void
-//      */
-//     export function loadEvents(eventsPath: string, events: IBotEvent[]) {
-//         const fs = require('fs');
-
-//         // Get a list of all events inside eventsFolder
-//         fs.readdir(eventsPath, (err: any, files: any) => {
-//             // For each file in eventsFolder, add to events variable
-//             files.forEach((eventName: any) => {
-//                 const eventsClass = require(`${eventsPath}/${replaceAll(eventName, ".js", "")}`)
-
-//                 const event = new eventsClass() as IBotEvent;
-
-//                 events.push(event);
-//             });
-//         })
-//     }
-
-//     /**
 //      * Load ALL Commands into Memory
 //      * @returns void
 //      */
@@ -555,7 +517,7 @@ export class discordUser {
     }
 
     getRobloxID() {
-        axios.get(`https://verify.eryn.io/api/user/${this.userID}`).then((response) => {
+        axios.get(`https://verify.eryn.io/api/user/${this.userID}`).then((response: any) => {
             return response.data.robloxId;
         });
     }
