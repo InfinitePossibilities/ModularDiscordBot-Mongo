@@ -1,23 +1,25 @@
-// Last modified: 2021/11/18 12:32:58
+// Last modified: 2021/11/21 19:29:08
 
 // APIs
 import { Client, Intents, MessageActionRow, MessageButton, ColorResolvable } from "discord.js";
 const Bloxy = require("devbloxy");
 
 //Config
-import { db, schemas } from "./database";
+import { db, schemas } from "modulardiscordbot-db";
 require('dotenv').config()
 import { config } from "./config";
-import { guildSettingsSchema } from "./interfaces";
-import { tableDefaults } from "./config";
-// import { tableExists } from "./util";
 
 // Internal Bot APIs
 import { IBotCommand, IBotDB, IBotEvent } from "./IBotAPIs";
 
 // Comand Handlers
-import { Schema, Model, model, models, connect, connection } from 'mongoose';
+import { connect } from 'mongoose';
 import { miscFunctions, indexFunctions } from "./util";
+
+import mongoose from "mongoose";
+import mongooseLong from "mongoose-long";
+
+mongooseLong(mongoose);
 
 // Declare Bot
 const bot: Client = new Client({ 
@@ -45,13 +47,12 @@ export let commands: IBotCommand[] = [],
     events: IBotEvent[] = [],
     directory = __dirname;
 
-// listCommands(`${__dirname}/commands`);
 indexFunctions.commands.loadAllCommands(commands, elevated_commands, __dirname);
-// util.loadEvents(`${__dirname}/events`, events);
+indexFunctions.dbs.loadDBs(`${directory}/dbs`, dbs);
 
 bot.on("ready", async() => {
     await connect(`mongodb://${config.host}:${config.port}/${config.database}`, {useNewUrlParser: true, useUnifiedTopology: true});
-    indexFunctions.dbs.queryAllDBs(dbs);
+    await indexFunctions.dbs.queryAllDBs(dbs);
     // if (!await miscFunctions.dbFunctions.collectionExists("Main_CoreSettings")) {
     //     await new db(schemas.main.coreMainModel(true)).createRecords([
     //         tableDefaults.main_settings[0]
@@ -100,25 +101,26 @@ bot.on("messageCreate", async (msg) => {
         if (!msg.guild?.available) return;
         // Respond "Pong!" to any "ping" message
         if (msg.content.toLowerCase() == "ping") { msg.channel.send("Pong!"); return; };
-        // Respond to "setup" command
-        if (msg.content.substring(2,7) == ('setup')) { return; } // TODO: Setup Handle
+        
+        let msgArgs = msg.content.split(" ");
+        
+        let globalPrefix = (await new db(schemas.main.coreMainModel(true)).readRecords(undefined, 'prefix'))[0].prefix;
+        let globalTest = (msg.content.startsWith(globalPrefix+globalPrefix) || (mentionRegExp.test(msgArgs[0]) && mentionRegExp.test(msgArgs[1])));
+
+        if (globalTest) {
+            await indexFunctions.commands.handleElevatedCommand(bot, elevated_commands, msg);
+        }
+        // if (msg.content.substring(2,7) == ('setup')) { return; } // TODO: Setup Handle
         // Return if guild settings collection does not exist in the database.
         // console.log(await miscFunctions.dbFunctions.collectionExists(undefined, msg.guild));
         if (!await miscFunctions.dbFunctions.collectionExists(undefined, msg.guild)) return;
 
-        let msgArgs = msg.content.split(" ");
         let localPrefix = (await new db(schemas.guild.coreGuildModel(msg.guild, true)).readRecords(undefined, 'prefix'))[0].prefix;
-        let globalPrefix = (await new db(schemas.main.coreMainModel(true)).readRecords(undefined, 'prefix'))[0].prefix;
-
         let localTest = (msg.content.startsWith(localPrefix) || mentionRegExp.test(msgArgs[0])) && !(msg.content.startsWith(globalPrefix+globalPrefix) || (mentionRegExp.test(msgArgs[0]) && mentionRegExp.test(msgArgs[1])));
-        let globalTest = (msg.content.startsWith(globalPrefix+globalPrefix) || (mentionRegExp.test(msgArgs[0]) && mentionRegExp.test(msgArgs[1])));
 
         // Test and handle local and global commands
         if (localTest) {
             await indexFunctions.commands.handleCommand(bot, commands, msg);
-        }
-        if (globalTest) {
-            await indexFunctions.commands.handleElevatedCommand(bot, elevated_commands, msg);
         }
 
         return;

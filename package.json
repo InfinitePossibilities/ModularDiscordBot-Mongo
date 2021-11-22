@@ -13,10 +13,13 @@
     "axios": "^0.21.1",
     "devbloxy": "^4.0.0-alpha4",
     "discord-buttons": "^4.0.0",
-    "discord.js": "^13.0.0",
+    "discord.js": "^13.3.1",
     "dotenv": "^10.0.0",
     "fs": "^0.0.1-security",
-    "mongoose": "^5.13.5"
+    "modulardiscordbot-auth": "github:InfinitePossibilities/ModularDiscordBot-Auth",
+    "modulardiscordbot-db": "github:InfinitePossibilities/ModularDiscordBot-DB",
+    "mongoose": "^5.13.5",
+    "mongoose-long": "^0.5.0"
   },
   "devDependencies": {
     "@types/node": "^16.11.6",

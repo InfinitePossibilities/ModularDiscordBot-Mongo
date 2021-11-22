@@ -1,11 +1,9 @@
+// Last modified: 2021/11/21 19:30:39
 import { Message, Client, MessageActionRow, MessageButton, ColorResolvable } from "discord.js";
 import { IBotCommand } from "../../IBotAPIs";
 import { CommandType } from "../../config";
-import { db, schemas } from "../../database";
-import { miscFunctions } from "../../util";
-// import { GuildSettings } from "../../database";
+import { db, schemas } from "modulardiscordbot-db";
 import { commands } from "../../app";
-// import { setMainEmbedColor } from '../../util';
 
 module.exports = class help implements IBotCommand {
     private readonly _command = "help";

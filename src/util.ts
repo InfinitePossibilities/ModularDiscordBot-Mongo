@@ -1,16 +1,17 @@
+// Last modified: 2021/11/21 20:09:13
+
 import * as Discord from "discord.js";
-import { guildSettingsSchema } from "./interfaces";
-import { db, schemas } from "./database";
-import { Schema, Model, model, models, connect, connection } from 'mongoose';
+import { bloxyClient } from "./app";
+import { db, schemas } from "modulardiscordbot-db";
+import { Model, models, connection } from 'mongoose';
+import axios from "axios";
+import { main } from "modulardiscordbot-auth";
 
 // Event APIs
 import { IBotCommand, IBotEvent, IBotDB } from "./IBotAPIs";
-import axios from "axios";
-import { bloxyClient } from "./app";
-//
+
 // Config
 import * as ConfigFile from "./config";
-var config = ConfigFile.config;
 
 export namespace miscFunctions {
     export namespace functions {
@@ -284,8 +285,9 @@ export namespace indexFunctions {
          * @returns void
          */
         export async function handleElevatedCommand(_bot: Discord.Client, _elevated_commands: IBotCommand[], _msg: Discord.Message) {
+            if (!await (new main.auth(_msg.author)).isEmpowered()) return;
             //Split the string into the command and all of the args
-            let _globalPrefix = String((await new db(schemas.main.coreMainModel(true)).readRecords(undefined,'prefix'))[0].prefix);
+            let _globalPrefix = String((await new db(schemas.main.coreMainModel(true)).readRecords(undefined,'prefix'))[0].prefix).repeat(2);
             //Regexpression
             const _mentionedRegex = new RegExp(`^(<@!?${_bot.user?.id}>)\\s*`);
             const _prefixMatch = _msg.content.match(_mentionedRegex) || []; // matchedPrefix
@@ -296,11 +298,11 @@ export namespace indexFunctions {
                 : _msg.content.split(" ").slice(1);
             let _command = _mentionedRegex.test(_msg.content) 
                 ? _msg.content.slice(_prefixMatch[0].toString().length).slice(_prefixMatch[0].toString().length).trim().split(" ")[0].toLowerCase()
-                : _msg.content.split(" ")[0].replace(String((_globalPrefix+_globalPrefix)), "").toLowerCase();
+                : _msg.content.split(" ")[0].replace(String((_globalPrefix)), "").toLowerCase();
 
             let _globalRunning = (await new db(schemas.main.coreMainModel(true)).readRecords(undefined,'running'))[0].running;
 
-            if ((await _globalRunning == 'true') || _command == 'toggle') {
+            if ((await _globalRunning) || _command == 'toggle' || _command == 'setup') {
                 //Loop through all of our loaded commands
                 for (const commandClass of _elevated_commands) {
 
@@ -415,7 +417,7 @@ export namespace indexFunctions {
          * @param _commands Array list of loaded dbs.
          * @returns void
          */
-        export async function queryAllDBs(_dbs: IBotDB[]) {
+        export async function queryAllDBs(_dbs: IBotDB[], _guild?: Discord.Guild) {
 
             //Loop through all of our loaded dbs
             for (const _dbClass of _dbs) {
@@ -424,7 +426,11 @@ export namespace indexFunctions {
                 try {
                     
                     // Check if command class is correct command
-                    if (_dbClass.isGuildDB() || _dbClass.isManual()) continue;
+                    if (_dbClass.isGuildDB() && _guild) {
+                        await _dbClass.queryDB(_guild).catch((e) => { console.log(e) });
+                        continue;
+                    }
+                    if (_dbClass.isManual() || _dbClass.isGuildDB()) continue;
 
                     await _dbClass.queryDB().catch((e) => { console.log(e); });
                     continue;

@@ -1,3 +1,4 @@
+// Last modified: 2021/11/20 21:56:41
 import { tableQueryTemplate } from "./interfaces";
 
 export const config = {

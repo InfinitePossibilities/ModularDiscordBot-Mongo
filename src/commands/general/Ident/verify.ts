@@ -1,11 +1,7 @@
+// Last modified: 2021/11/20 21:58:05
 import * as Discord from "discord.js";
 import { IBotCommand } from "../../../IBotAPIs";
 import { CommandType } from "../../../config";
-import { db, schemas } from "../../../database";
-import { miscFunctions } from "../../../util";
-// import { GuildSettings } from "../../database";
-import { commands } from "../../../app";
-// import { setMainEmbedColor } from '../../util';
 
 module.exports = class verify implements IBotCommand {
     private readonly _command = "verify";

@@ -1,3 +1,4 @@
+// Last modified: 2021/11/20 21:56:57
 import * as Discord from "discord.js";
 import { EventType, CommandType } from "./config";
 

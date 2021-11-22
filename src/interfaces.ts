@@ -1,5 +1,4 @@
-import * as Discord from "discord.js";
-import { Schema, model } from 'mongoose';
+// Last modified: 2021/11/21 00:53:46
 
 export {
     questionTemplate,
@@ -62,9 +61,9 @@ interface guildSettingsSchema {
 interface mainSettingsSchema {
     running: boolean, 
     prefix: string, 
-    devs: number[],
-    admins: number[],
-    mods: number[],
+    devs: string[],
+    admins: string[],
+    mods: string[],
     maincolor: number[],
     botname: string,
     disabledCommands: string[],

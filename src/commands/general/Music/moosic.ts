@@ -1,7 +1,8 @@
+// Last modified: 2021/11/21 19:30:46
 import * as Discord from "discord.js";
 import { IBotCommand } from "../../../IBotAPIs";
 import { CommandType } from "../../../config";
-import { db, schemas } from "../../../database";
+import { db, schemas } from "modulardiscordbot-db";
 import { miscFunctions } from "../../../util";
 // import { GuildSettings } from "../../database";
 import { commands } from "../../../app";
