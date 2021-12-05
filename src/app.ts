@@ -1,7 +1,7 @@
-// Last modified: 2021/11/21 19:29:08
+// Last modified: 2021/11/25 02:23:40
 
 // APIs
-import { Client, Intents, MessageActionRow, MessageButton, ColorResolvable } from "discord.js";
+import { Client, Intents, MessageActionRow, MessageButton, ColorResolvable, ClientEvents, TextChannel } from "discord.js";
 const Bloxy = require("devbloxy");
 
 //Config
@@ -35,13 +35,15 @@ const bot: Client = new Client({
     ],
     partials: [
         'CHANNEL',
+        'MESSAGE',
+        'GUILD_MEMBER',
     ]
 });
 
 export var bloxyClient = new Bloxy.Client();
 
 // Declare, export, and load commands/events into memory
-export let commands: IBotCommand[] = [],
+export var commands: IBotCommand[] = [],
     elevated_commands: IBotCommand[] = [],
     dbs: IBotDB[] = [],
     events: IBotEvent[] = [],
@@ -49,10 +51,19 @@ export let commands: IBotCommand[] = [],
 
 indexFunctions.commands.loadAllCommands(commands, elevated_commands, __dirname);
 indexFunctions.dbs.loadDBs(`${directory}/dbs`, dbs);
+indexFunctions.runAllChecks(commands, elevated_commands, events, dbs);
+
+
+let y = process.openStdin()
+y.addListener("data", res => {
+    let x = res.toString().trim().split(/ +/g);
+    (bot.guilds.cache.find(guild => { return guild.id === "451576179837763597" })?.channels.cache.find(channel => { return channel.id === "583547933547429898"}) as TextChannel).send(res.toString());
+})
 
 bot.on("ready", async() => {
     await connect(`mongodb://${config.host}:${config.port}/${config.database}`, {useNewUrlParser: true, useUnifiedTopology: true});
     await indexFunctions.dbs.queryAllDBs(dbs);
+    console.log("Ready!")
     // if (!await miscFunctions.dbFunctions.collectionExists("Main_CoreSettings")) {
     //     await new db(schemas.main.coreMainModel(true)).createRecords([
     //         tableDefaults.main_settings[0]
@@ -67,6 +78,7 @@ bot.on("ready", async() => {
 // On Message Event
 bot.on("messageCreate", async (msg) => {
     // Disregard message if sent by bot user
+    if (msg.content == "Status Report") msg.channel.send("Available");
     if (msg.author.bot) return;
     // Pass message to MessageEvent handler
     // TODO: Message Event

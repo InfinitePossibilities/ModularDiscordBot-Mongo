@@ -1,4 +1,4 @@
-// Last modified: 2021/11/21 20:08:49
+// Last modified: 2021/11/24 01:38:32
 import { Message, Client, Role, ColorResolvable, MessageActionRow, MessageButton, MessageEmbed } from "discord.js";
 import { IBotCommand } from "../../IBotAPIs";
 import { CommandType } from "../../config";
@@ -7,22 +7,31 @@ import { main, guild } from "modulardiscordbot-auth";
 import { db, schemas } from "modulardiscordbot-db";
 
 module.exports = class test implements IBotCommand {
-    private readonly _command = "test";
-    private readonly _aliases = [];
-    private readonly _description = "Cool test command, yes?";
-    private readonly _syntax = "<command>";
-    private readonly _arguments = ["list"];
+    private readonly _info = {
+        command: "test",
+        aliases: [],
+        description: "Cool test command, yes?",
+        syntax: "<command>",
+        arguments: [
+            {
+                arg: "list",
+                aliases: [],
+                description: "",
+                syntax: "",
+            }
+        ]
+    }
     private readonly _isTest = false;
     private readonly _Type = CommandType.GENERAL;
 
     info = {
-        command: (): string => { return this._command },
-        aliases: () => { return this._aliases },
-        description: (): string => { return this._description },
-        syntax: (): string => { return this._syntax },
-        arguments: () => { return this._arguments },
+        getCommand: (): string => { return this._info.command },
+        getAliases: () => { return this._info.aliases },
+        getDescription: (): string => { return this._info.description },
+        getSyntax: (): string => { return this._info.syntax },
+        getArguments: () => { return this._info.arguments },
         isTest: (): boolean => { return this._isTest },
-        Type: (): CommandType => { return this._Type }
+        getType: (): CommandType => { return this._Type }
     }
 
     runCommand = async (args: string[], msgObject: Message, client: Client): Promise<void> => {

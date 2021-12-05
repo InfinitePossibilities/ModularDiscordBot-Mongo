@@ -1,11 +1,11 @@
-// Last modified: 2021/11/23 17:28:07
+// Last modified: 2021/11/24 23:51:09
 import { IBotDB } from "../IBotAPIs";
 import { miscFunctions } from "../util";
 import { db, schemas } from "modulardiscordbot-db";
 import { Guild } from "discord.js";
 
-module.exports = class nda implements IBotDB {
-    private readonly _id = "nda";
+module.exports = class embedboards implements IBotDB {
+    private readonly _id = "embedboards";
     private readonly _isGuildDB = true;
     private readonly _isManual = false;
 
@@ -20,18 +20,18 @@ module.exports = class nda implements IBotDB {
 
     queryDB = async (_guild: Guild): Promise<void> => {
         try {
-            if (!await miscFunctions.dbFunctions.collectionExists(`${_guild.id}_NDA`)) {
-                console.log(`Creating ${_guild.id}_NDA`);
-                await new db(schemas.template.templateModel(`${_guild.id}_NDA`, true)).createCollection()
+            if (!await miscFunctions.dbFunctions.collectionExists(`${_guild.id}_EmbedBoards`)) {
+                console.log(`Creating ${_guild.id}_EmbedBoards`);
+                await new db(schemas.template.templateModel(`${_guild.id}_EmbedBoards`, true)).createCollection()
                 .then(() => {
-                    console.log(`Successfully created ${_guild.id}_NDA`);
+                    console.log(`Successfully created ${_guild.id}_EmbedBoards`);
                 }).catch((e) => {
-                    console.log(`Failed creating ${_guild.id}_NDA`);
+                    console.log(`Failed creating ${_guild.id}_EmbedBoards`);
                     console.log(e)
                 });
             }
         }catch(e) {
-            console.log(`Failed creating ${_guild.id}_NDA`);
+            console.log(`Failed creating ${_guild.id}_EmbedBoards`);
             console.log(e);
         }
     }

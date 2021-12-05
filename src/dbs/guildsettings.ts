@@ -1,22 +1,27 @@
-// Last modified: 2021/11/21 19:30:24
+// Last modified: 2021/11/22 15:01:16
 import { IBotDB } from "../IBotAPIs";
 import { miscFunctions } from "../util";
 import { db, schemas } from "modulardiscordbot-db";
 import { Guild } from "discord.js";
 
 module.exports = class guildsettings implements IBotDB {
+    private readonly _id = "guildsettings";
     private readonly _isGuildDB = true;
     private readonly _isManual = false;
 
-    default_guild_settings = {
+    private readonly default_guild_settings = {
         "running": true,
         "prefix": "-",
         "botname": "Test Bot",
         "maincolor": [0, 0, 0],
     };
+
+    info = {
+        _id: () => { return this._id },
+        isGuildDB: (): boolean => { return this._isGuildDB },
+        isManual: (): boolean => { return this._isManual },
+    }
     
-    isGuildDB(): boolean { return this._isGuildDB };
-    isManual(): boolean { return this._isManual };
     queryDB = async (_guild: Guild): Promise<void> => {
         try {
             if (!await miscFunctions.dbFunctions.collectionExists(`${_guild.id}_CoreSettings`)) {

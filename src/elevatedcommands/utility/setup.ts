@@ -1,4 +1,4 @@
-// Last modified: 2021/11/21 20:08:58
+// Last modified: 2021/11/24 02:06:37
 import { Message, Client, MessageActionRow, MessageButton, ColorResolvable } from "discord.js";
 import { dbs } from "../../app";
 import { IBotCommand } from "../../IBotAPIs";
@@ -8,22 +8,24 @@ import { main, guild } from "modulardiscordbot-auth";
 import { db, schemas } from "modulardiscordbot-db";
 
 module.exports = class setup implements IBotCommand {
-    private readonly _command = "setup";
-    private readonly _aliases = [];
-    private readonly _description = "Initialize guild related settings.";
-    private readonly _syntax = "";
-    private readonly _arguments = [];
+    private readonly _info = {
+        command: "setup",
+        aliases: [],
+        description: "Initialize guild related settings.",
+        syntax: "",
+        arguments: [],
+    }
     private readonly _isTest = false;
     private readonly _Type = CommandType.UTILITY;
 
     info = {
-        command: (): string => { return this._command },
-        aliases: () => { return this._aliases },
-        description: (): string => { return this._description },
-        syntax: (): string => { return this._syntax },
-        arguments: () => { return this._arguments },
+        getCommand: (): string => { return this._info.command },
+        getAliases: () => { return this._info.aliases },
+        getDescription: (): string => { return this._info.description },
+        getSyntax: (): string => { return this._info.syntax },
+        getArguments: () => { return this._info.arguments },
         isTest: (): boolean => { return this._isTest },
-        Type: (): CommandType => { return this._Type }
+        getType: (): CommandType => { return this._Type }
     }
 
     runCommand = async (_args: string[], _msgObject: Message, _client: Client): Promise<void> => {

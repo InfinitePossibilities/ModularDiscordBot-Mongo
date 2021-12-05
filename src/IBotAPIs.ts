@@ -1,33 +1,41 @@
-// Last modified: 2021/11/20 21:56:57
-import * as Discord from "discord.js";
+// Last modified: 2021/11/24 01:33:38
+import { Client, Message, Guild, ClientEvents } from "discord.js";
 import { EventType, CommandType } from "./config";
 
 export interface IBotEvent {
     info: {
-        event(): string;
-        help(): string;
+        getEvent(): ClientEvents;
+        getHelp(): string;
         isTest(): boolean;
-        Type(): EventType;
+        getType(): EventType;
     }
-    runEvent(bot: Discord.Client, extra: any): Promise<void>;
+    runEvent(bot: Client, extra: any): Promise<void>;
 }
 
 export interface IBotCommand {
     info: {
-        command: () => string;
-        aliases: () => string[] | [];
-        description: () => string;
-        syntax: () => string;
-        arguments: () => string[] | [] | undefined;
-        subcategory?: () => string;
+        getCommand: () => string;
+        getAliases: () => string[] | [];
+        getDescription: () => string;
+        getSyntax: () => string;
+        getArguments: () => {
+            arg: string,
+            aliases: string[] | [],
+            description: string,
+            syntax: string
+        }[] | [] | undefined;
+        getSubcategory?: () => string;
         isTest: () => boolean;
-        Type: () => CommandType;
+        getType: () => CommandType;
     }
-    runCommand(args: string[], msgObject: Discord.Message, bot: Discord.Client): Promise<void>;
+    runCommand(args: string[], msgObject: Message, bot: Client): Promise<void>;
 }
 
 export interface IBotDB {
-    isGuildDB(): boolean;
-    isManual(): boolean;
-    queryDB(guild?: Discord.Guild): Promise<void>;
+    info: {
+        _id(): string;
+        isGuildDB(): boolean;
+        isManual(): boolean;
+    };
+    queryDB(guild?: Guild): Promise<void>;
 }

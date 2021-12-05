@@ -1,4 +1,4 @@
-// Last modified: 2021/11/21 19:30:39
+// Last modified: 2021/11/24 23:32:26
 import { Message, Client, MessageActionRow, MessageButton, ColorResolvable } from "discord.js";
 import { IBotCommand } from "../../IBotAPIs";
 import { CommandType } from "../../config";
@@ -6,22 +6,31 @@ import { db, schemas } from "modulardiscordbot-db";
 import { commands } from "../../app";
 
 module.exports = class help implements IBotCommand {
-    private readonly _command = "help";
-    private readonly _aliases = ["h"];
-    private readonly _description = "Shows basic information and command syntax.";
-    private readonly _syntax = "<command>";
-    private readonly _arguments = ["list"];
+    private readonly _info = {
+        command: "help",
+        aliases: ["h"],
+        description: "Shows basic information and command syntax.",
+        syntax: "<command>",
+        arguments: [
+            {
+                arg: "list",
+                aliases: ["l"],
+                description: "List commands",
+                syntax: "list",
+            }
+        ],
+    }
     private readonly _isTest = false;
     private readonly _Type = CommandType.GENERAL;
 
     info = {
-        command: (): string => { return this._command },
-        aliases: () => { return this._aliases },
-        description: (): string => { return this._description },
-        syntax: (): string => { return this._syntax },
-        arguments: () => { return this._arguments },
+        getCommand: (): string => { return this._info.command },
+        getAliases: () => { return this._info.aliases },
+        getDescription: (): string => { return this._info.description },
+        getSyntax: (): string => { return this._info.syntax },
+        getArguments: () => { return this._info.arguments },
         isTest: (): boolean => { return this._isTest },
-        Type: (): CommandType => { return this._Type }
+        getType: (): CommandType => { return this._Type }
     }
 
     runCommand = async (args: string[], msgObject: Message, client: Client): Promise<void> => {
@@ -52,7 +61,7 @@ let sendHelpList = async (_client: Client, _msgObject: Message) => {
     let _guildSettings = await new db(schemas.guild.coreGuildModel(_msgObject.guild, true));
     let _guildPrefix = String( _msgObject.content.substring(0,1) );
 
-    let _title = `\`Usage: ${_guildPrefix + _helpClass.info.command() + " " + _helpClass.info.syntax()}\`\n\n`;
+    let _title = `\`Usage: ${_guildPrefix + _helpClass.info.getCommand() + " " + _helpClass.info.getSyntax()}\`\n\n`;
     let _generalTitle = '**General Commands**\n', _generalCommands = ``;
     let _utilityTitle = '**Utility Commands**\n', _utilityCommands = ``;
     let _developerTitle = '**Development Commands**\n', _developerCommands = ``;
@@ -65,20 +74,20 @@ let sendHelpList = async (_client: Client, _msgObject: Message) => {
         try {
 
             if (await command.info.isTest() == true) {}else {
-                let commandName = command.info.command();
-                let commandSyntax = command.info.syntax();
-                let commandDesc = command.info.description();
+                let commandName = command.info.getCommand();
+                let commandSyntax = command.info.getSyntax();
+                let commandDesc = command.info.getDescription();
 
-                if (!command.info.subcategory) {
-                    switch (command.info.Type()) {
+                if (!command.info.getSubcategory) {
+                    switch (command.info.getType()) {
                         case (CommandType.GENERAL): { _generalCommands += `:white_medium_small_square: \`${_guildPrefix+commandName.charAt(0).toUpperCase()+commandName.slice(1)+" "+commandSyntax}\` - ${commandDesc}\n`; break; }
                         case (CommandType.UTILITY): { _utilityCommands += `:white_medium_small_square: \`${_guildPrefix+commandName.charAt(0).toUpperCase()+commandName.slice(1)+" "+commandSyntax}\` - ${commandDesc}\n`; break; }
                         case (CommandType.DEVELOPER): { _developerCommands += `:white_medium_small_square: \`${_guildPrefix+commandName.charAt(0).toUpperCase()+commandName.slice(1)+" "+commandSyntax}\` - ${commandDesc}\n`; break; }
                     }
                 }else {
-                    let _category = command.info.subcategory();
+                    let _category = command.info.getSubcategory();
                     if (!_categories.includes(_category)) _categories.push(_category);
-                    _categorizedCommands.push([_category, command.info.Type(), `> :white_medium_small_square: \`${_guildPrefix+commandName.charAt(0).toUpperCase()+commandName.slice(1)+" "+commandSyntax}\` - ${commandDesc}\n`]);
+                    _categorizedCommands.push([_category, command.info.getType(), `> :white_medium_small_square: \`${_guildPrefix+commandName.charAt(0).toUpperCase()+commandName.slice(1)+" "+commandSyntax}\` - ${commandDesc}\n`]);
                 }
             }
 
@@ -125,6 +134,9 @@ let sendHelpList = async (_client: Client, _msgObject: Message) => {
         color: (await _guildSettings.readRecords(undefined, "maincolor"))[0].maincolor as ColorResolvable,
         title: '**Commands**',
         description: _title+(_generalCommands ? (_generalTitle+_generalCommands) + "\n" : "")+(_utilityCommands ? (_utilityTitle+_utilityCommands) + "\n" : "")+(_developerCommands ? (_developerTitle+_developerCommands) + "\n" : ""),
+        thumbnail: { 
+            url: (_client.user?.displayAvatarURL() as string) 
+        },
         timestamp: new Date(),
         footer: {
             text: (await _guildSettings.readRecords(undefined, "botname"))[0].botname,
@@ -135,24 +147,20 @@ let sendHelpList = async (_client: Client, _msgObject: Message) => {
 }
 
 let sendCommandHelp = async (_client: Client, _msgObject: Message, args: string[], type: string) => {
-    let _commandClass = commands.find((command) => { return command.info.command() == args[0].toLowerCase() });
+    let _commandClass = commands.find((command) => { return command.info.getCommand() == args[0].toLowerCase() || (command.info.getAliases() as string[]).indexOf(args[0].toLowerCase()) > -1 });
     
-    let sendCommandEmbed = async (_commandClass: IBotCommand) => {
+    let sendembed = async (_command: string, _aliases: string, _usage: string, _args: string, _description: string) => {
         if (!_msgObject.guild?.available || type == "undefined") return;
 
         let _guildSettings = await new db(schemas.guild.coreGuildModel(_msgObject.guild, true));
-        let _guildPrefix = String( _msgObject.content.substring(0,1) );
-    
-        let _command = `\`Command: ${_commandClass.info.command().charAt(0).toUpperCase()+_commandClass.info.command().slice(1)}\`\n`;
-        let _usage = `\`Usage: ${_guildPrefix + _commandClass.info.command() + " " + _commandClass.info.syntax()}\`\n`;
-        let _aliases = (_commandClass.info.aliases().length as number > 0) ? `\`Aliases: ${(_commandClass.info.aliases() as string[]).sort().join(", ")}\`\n` : ""
-        let _args = _commandClass.info.arguments() ? ((_commandClass.info.arguments()?.length as number > 0) ? `\`Arguments: ${(_commandClass.info.arguments() as string[]).sort().join(", ")}\`\n` : "") : ""
-        let _description = _commandClass.info.description();
-    
-        const commandEmbed = {
+        
+        const embed = {
             color: (await _guildSettings.readRecords(undefined, "maincolor"))[0].maincolor as ColorResolvable,
             title: `**Command Information**`,
             description: _command+_aliases+_usage+_args+"\n"+_description,
+            thumbnail: { 
+                url: (_client.user?.displayAvatarURL() as string) 
+            },
             timestamp: new Date(),
             footer: {
                 text: _client.user?.username,
@@ -160,7 +168,39 @@ let sendCommandHelp = async (_client: Client, _msgObject: Message, args: string[
             },
         };
     
-        _msgObject.channel.send({ embeds: [commandEmbed] });
+        _msgObject.channel.send({ embeds: [embed] });
+    }
+    let sendCommandEmbed = async (_commandClass: IBotCommand) => {
+        if (!_msgObject.guild?.available || type == "undefined") return;
+        let _cmdArgs: string[] = [];
+        for (let _arg of _commandClass.info.getArguments() as []) {
+            _cmdArgs.push(_arg["arg"]);
+        }
+        
+        let _guildPrefix = String( _msgObject.content.substring(0,1) );
+    
+        let _command = `\`Command: ${_commandClass.info.getCommand().charAt(0).toUpperCase()+_commandClass.info.getCommand().slice(1)}\`\n`;
+        let _usage = `\`Usage: ${_guildPrefix + _commandClass.info.getCommand() + " " + _commandClass.info.getSyntax()}\`\n`;
+        let _aliases = (_commandClass.info.getAliases().length as number > 0) ? `\`Aliases: ${(_commandClass.info.getAliases() as string[]).sort().join(", ")}\`\n` : ""
+        let _args = _cmdArgs ? ((_cmdArgs.length as number > 0) ? "> " + `\`Arguments: ${_cmdArgs.sort().join(", ")}\`\n` : "") : ""
+        let _description = "> " + _commandClass.info.getDescription();
+
+        await sendembed(_command, _aliases, _usage, _args, _description);
+    }
+    let handleSubargumentEmbed = async (_commandClass: IBotCommand) => {
+        if (!_msgObject.guild?.available || type == "undefined") return;
+        let _subArgument = (_commandClass.info.getArguments() as []).find((arg) => { return arg["arg"] == args[1].toLowerCase() });
+        if (!_subArgument) return;
+
+        let _guildPrefix = String( _msgObject.content.substring(0,1) );
+    
+        let _command = `\`Argument: ${(_subArgument["arg"] as string).charAt(0).toUpperCase()+(_subArgument["arg"] as string).slice(1)}\`\n`;
+        let _usage = `\`Usage: ${_guildPrefix + _commandClass.info.getCommand() + " " + (_subArgument["syntax"] as string)}\`\n`;
+        let _aliases = ((_subArgument["aliases"] as string[]).length as number > 0) ? `\`Aliases: ${(_subArgument["aliases"] as string[]).sort().join(", ")}\`\n` : ""
+        let _args = ""
+        let _description = "> " + _subArgument["description"] as string;
+
+        await sendembed(_command, _aliases, _usage, _args, _description);
     }
 
     const errorButtonRow = new MessageActionRow().addComponents(
@@ -180,6 +220,9 @@ let sendCommandHelp = async (_client: Client, _msgObject: Message, args: string[
             color: [255,0,0] as ColorResolvable,
             title: 'Error',
             description: `No command with the specified name or alias exists! \n\nPlease report any unfixable errors below.`,
+            thumbnail: { 
+                url: (_client.user?.displayAvatarURL() as string) 
+            },
             timestamp: new Date(),
             footer: {
                 text: _client.user?.username,
@@ -191,7 +234,7 @@ let sendCommandHelp = async (_client: Client, _msgObject: Message, args: string[
     }
     
     _commandClass
-        ? await sendCommandEmbed(_commandClass)
+        ? args.length == 1 ? await sendCommandEmbed(_commandClass) : await handleSubargumentEmbed(_commandClass)
         : await sendErrorEmbed();
 }
 
@@ -199,8 +242,8 @@ function getCommandType(targetCommand: string): string {
     for (const command of commands) {
         try {
 
-            if (command.info.command() == targetCommand.toLowerCase()) {
-                switch (command.info.Type()) {
+            if (command.info.getCommand() == targetCommand.toLowerCase() || (command.info.getAliases() as string[]).indexOf(targetCommand.toLowerCase()) > -1) {
+                switch (command.info.getType()) {
                     case (CommandType.GENERAL): { return "general"; }
                     case (CommandType.UTILITY): { return "utility"; }
                     case (CommandType.DEVELOPER): { return "developer"; }

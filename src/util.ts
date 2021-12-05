@@ -1,7 +1,7 @@
-// Last modified: 2021/11/21 20:09:13
+// Last modified: 2021/11/23 17:00:49
 
-import * as Discord from "discord.js";
-import { bloxyClient } from "./app";
+import { Client, Message, Guild, ClientEvents, MessageEmbed } from "discord.js";
+import { bloxyClient, commands, elevated_commands, events, dbs } from "./app";
 import { db, schemas } from "modulardiscordbot-db";
 import { Model, models, connection } from 'mongoose';
 import axios from "axios";
@@ -12,6 +12,7 @@ import { IBotCommand, IBotEvent, IBotDB } from "./IBotAPIs";
 
 // Config
 import * as ConfigFile from "./config";
+import { resolve } from "path/posix";
 
 export namespace miscFunctions {
     export namespace functions {
@@ -42,7 +43,7 @@ export namespace miscFunctions {
          * @param color Color converted to R,G,B
          * @returns void
          */
-        export async function setEmbedColor(embed: Discord.MessageEmbed, color: string) {
+        export async function setEmbedColor(embed: MessageEmbed, color: string) {
             if (String(color).includes(`,`)) {
                 var c = replaceAll(String(color).replace('[','').replace(']',''), ' ', '').split(`,`);
                 embed.setColor([parseInt(c[0]),parseInt(c[1]),parseInt(c[2])]);
@@ -55,7 +56,7 @@ export namespace miscFunctions {
          * @param embed Embed to focus
          * @returns void
          */
-        export async function setMainEmbedColor(embed: Discord.MessageEmbed, guild?: Discord.Guild) {
+        export async function setMainEmbedColor(embed: MessageEmbed, guild?: Guild) {
             let _model = guild ? schemas.guild.coreGuildModel(guild) : schemas.main.coreMainModel();
 
             let _Settings = new db(_model);
@@ -73,7 +74,7 @@ export namespace miscFunctions {
          * @param collection Collection in database to search for
          * @returns Promise<boolean>
          */
-        export async function collectionExists(_collection?: string, _guild?: Discord.Guild) {
+        export async function collectionExists(_collection?: string, _guild?: Guild) {
             if (_collection) {
                 return new Promise(async (resolve) => {
                     connection.db.listCollections({name: _collection}).next(function(err, collinfo) {
@@ -105,7 +106,7 @@ export namespace miscFunctions {
          * @param guild Optional parameter to define which model to use.
          * @returns Promise<boolean>
          */
-        export async function settings_RecordExists(setting: string, value: string, guild?: Discord.Guild) {
+        export async function settings_RecordExists(setting: string, value: string, guild?: Guild) {
             let _model: Model<any, {}, {}> = guild ? schemas.guild.coreGuildModel(guild, true) : schemas.main.coreMainModel(true);
     
             return new Promise(async (resolve) => {
@@ -122,12 +123,34 @@ export namespace miscFunctions {
         }
 
         /**
+         * Returns a boolean based on whether or not a record has an existant setting key.
+         * @param _key Record key to check for
+         * @param _value Setting value to check for
+         * @param _model Optional parameter to define which model to use.
+         * @returns Promise<boolean>
+         */
+        export async function template_RecordExists(_key: string, _value: string, _model: Model<any, {}, {}> ) {
+    
+            return new Promise(async (resolve) => {
+                var _obj: any = { }
+                _obj[_key] = _value;
+                _model.countDocuments(_obj, (err, count) => {
+                    if (count > 0) {
+                        resolve(true);
+                        return;
+                    }
+                    resolve(false);
+                });
+            });
+        }
+
+        /**
          * Checks a specific setting and returns true if not equal to null
          * @param table Table in database to use.
          * @param setting Setting to check for.
          * @returns boolean
          */
-        export async function settings_KeyIsSet(setting: string, guild?: Discord.Guild) {
+        export async function settings_KeyIsSet(setting: string, guild?: Guild) {
             var _record = (await new db(guild ? schemas.guild.coreGuildModel(guild, true) : schemas.main.coreMainModel(true)).readRecords(undefined, setting))[0][setting];
             return !(_record == '' || _record == undefined || _record == null);
         }
@@ -191,7 +214,7 @@ export namespace indexFunctions {
          * @param _msg Discord message object.
          * @returns void
          */
-        export async function handleCommand(_bot: Discord.Client, _commands: IBotCommand[], _msg: Discord.Message) {
+        export async function handleCommand(_bot: Client, _commands: IBotCommand[], _msg: Message) {
             if (!_msg.guild?.available) return;
             //Split the string into the command and all of the args
             let _guildPrefix = _msg.content.substring(0,1);
@@ -214,7 +237,7 @@ export namespace indexFunctions {
                 //Loop through all of our loaded commands
                 for (const _commandClass of _commands) {
                     let _aliasExists = false;
-                    for (const _commandAlias of _commandClass.info.aliases()) {
+                    for (const _commandAlias of _commandClass.info.getAliases()) {
                         //Attempt to execute code but keep running incase of error
                         try {
                             // Check if issues command matches defined aliases in commandClass
@@ -236,7 +259,7 @@ export namespace indexFunctions {
                     try {
                         
                         // Check if command class is correct command
-                        if (!(_commandClass.info.command() === _command)) continue;
+                        if (!(_commandClass.info.getCommand() === _command)) continue;
 
                         await _commandClass.runCommand(_args, _msg, _bot).catch((e) => { console.log(e); _msg.channel.send("There was an error running that command! Please notify your local developer!"); });
                         break;
@@ -261,20 +284,16 @@ export namespace indexFunctions {
             const commandsFolder = _commandsPath;
 
             // Get a list of all commands inside commandsFolder
-            fs.readdir(commandsFolder, (err: any, files: any) => {
-                // For each file in commandsFolder, add to commands variable
-                if (!files) return;
-                files.forEach((fileName: any) => {
-                    const filePath = `${_commandsPath}/${fileName}`;
-                    if (fs.lstatSync(filePath).isDirectory()) { indexFunctions.commands.loadCommands(filePath, _commands); return; }
-                    
-                    const commandsClass = require(`${_commandsPath}/${miscFunctions.functions.replaceAll(fileName, ".js", "")}`)
+            fs.readdirSync(commandsFolder).forEach((fileName: any) => {
+                const filePath = `${_commandsPath}/${fileName}`;
+                if (fs.lstatSync(filePath).isDirectory()) { indexFunctions.commands.loadCommands(filePath, _commands); return; }
+                
+                const commandsClass = require(`${_commandsPath}/${miscFunctions.functions.replaceAll(fileName, ".js", "")}`)
 
-                    const command = new commandsClass() as IBotCommand;
+                const command = new commandsClass() as IBotCommand;
 
-                    _commands.push(command);
-                });
-            })
+                _commands.push(command);
+            });
         }
 
         /**
@@ -284,7 +303,7 @@ export namespace indexFunctions {
          * @param _msg Message object.
          * @returns void
          */
-        export async function handleElevatedCommand(_bot: Discord.Client, _elevated_commands: IBotCommand[], _msg: Discord.Message) {
+        export async function handleElevatedCommand(_bot: Client, _elevated_commands: IBotCommand[], _msg: Message) {
             if (!await (new main.auth(_msg.author)).isEmpowered()) return;
             //Split the string into the command and all of the args
             let _globalPrefix = String((await new db(schemas.main.coreMainModel(true)).readRecords(undefined,'prefix'))[0].prefix).repeat(2);
@@ -304,15 +323,33 @@ export namespace indexFunctions {
 
             if ((await _globalRunning) || _command == 'toggle' || _command == 'setup') {
                 //Loop through all of our loaded commands
-                for (const commandClass of _elevated_commands) {
+                for (const _commandClass of _elevated_commands) {
+                    let _aliasExists = false;
+                    for (const _commandAlias of _commandClass.info.getAliases()) {
+                        //Attempt to execute code but keep running incase of error
+                        try {
+                            // Check if issues command matches defined aliases in commandClass
+                            if (!(_commandAlias === _command)) continue;
+
+                            await _commandClass.runCommand(_args, _msg, _bot).catch((e) => { console.log(e); _msg.channel.send("There was an error running that command! Please notify your local developer!"); })
+                            _aliasExists = true;
+                            break;
+                        }
+                        catch (exception) {
+                            //If there is an error, log error exception for debug
+                            console.log(exception);
+                        }
+                    }
+
+                    if (_aliasExists) break;
 
                     //Attempt to execute code but keep running incase of error
                     try {
                         
                         // Check if command class is correct command
-                        if (!(commandClass.info.command() === _command)) continue;
+                        if (!(_commandClass.info.getCommand() === _command)) continue;
 
-                        await commandClass.runCommand(_args, _msg, _bot).catch((e) => { console.log(e); _msg.channel.send("There was an error running that command! Please notify your local developer!"); });
+                        await _commandClass.runCommand(_args, _msg, _bot).catch((e) => { console.log(e); _msg.channel.send("There was an error running that command! Please notify your local developer!"); });
 
                     }
                     catch (exception) {
@@ -332,9 +369,51 @@ export namespace indexFunctions {
          */
         export function loadAllCommands(_commands: IBotCommand[], _elevated_commands: IBotCommand[], _directory: string) {
             Object.keys(ConfigFile.CommandType).forEach((commandType) => {
-                indexFunctions.commands.loadCommands(`${_directory}/commands/${commandType.toString().toLowerCase()}`, _commands);
-                indexFunctions.commands.loadCommands(`${_directory}/elevatedcommands/${commandType.toString().toLowerCase()}`, _elevated_commands);
+                if (require("fs").existsSync(`${_directory}/commands/${commandType.toString().toLowerCase()}`)) {
+                    indexFunctions.commands.loadCommands(`${_directory}/commands/${commandType.toString().toLowerCase()}`, _commands);
+                }
+                if (require("fs").existsSync(`${_directory}/elevatedcommands/${commandType.toString().toLowerCase()}`)) {
+                    indexFunctions.commands.loadCommands(`${_directory}/elevatedcommands/${commandType.toString().toLowerCase()}`, _elevated_commands);
+                }
             });
+        }
+
+        export function duplicateCheck(_commands: IBotCommand[], _elevated_commands: IBotCommand[]): boolean {
+            let _commandStats = {
+                _commands: [] as string[],
+                _commandDuplicates: [] as string[],
+                _aliases: [] as string[],
+                _aliasDuplicates: [] as string[]
+            }
+            let _elevated_commandStats = {
+                _commands: [] as string[],
+                _commandDuplicates: [] as string[],
+                _aliases: [] as string[],
+                _aliasDuplicates: [] as string[]
+            }
+
+            for (const _command of _commands) {
+                if (_commandStats._commands.indexOf(_command.info.getCommand()) > -1) { _commandStats._commandDuplicates.push(_command.info.getCommand()); }
+                _commandStats._commands.push(_command.info.getCommand());
+                for (const _alias of _command.info.getAliases()) {
+                    if (_commandStats._aliases.indexOf(_alias) > -1) { _commandStats._aliasDuplicates.push(_alias); }
+                    _commandStats._aliases.push(_alias);
+                }
+            }
+            for (const _elevated_command of _elevated_commands) {
+                if (_elevated_commandStats._commands.indexOf(_elevated_command.info.getCommand()) > -1) { _elevated_commandStats._commandDuplicates.push(_elevated_command.info.getCommand()) }
+                _elevated_commandStats._commands.push(_elevated_command.info.getCommand());
+                for (const _alias of _elevated_command.info.getAliases()) {
+                    if (_elevated_commandStats._aliases.indexOf(_alias) > -1) { _elevated_commandStats._aliasDuplicates.push(_alias); }
+                    _elevated_commandStats._aliases.push(_alias);
+                }
+            }
+            let _checkOutcome = true;
+            if(_commandStats._commandDuplicates.length > 0) { console.log("Duplicate commands found!", _commandStats._commandDuplicates); _checkOutcome = false; }
+            if(_commandStats._aliasDuplicates.length > 0) { console.log("Duplicate command aliases found!", _commandStats._aliasDuplicates); _checkOutcome = false; }
+            if(_elevated_commandStats._commandDuplicates.length > 0) { console.log("Duplicate elevated commands found!", _elevated_commandStats._commandDuplicates); _checkOutcome = false; }
+            if(_elevated_commandStats._aliasDuplicates.length > 0) { console.log("Duplicate elevated command aliases found!", _elevated_commandStats._aliasDuplicates); _checkOutcome = false; }
+            return !_checkOutcome;
         }
     }
 
@@ -345,12 +424,12 @@ export namespace indexFunctions {
          * @param extra Extra variables to pass into event scope.
          * @returns void
          */
-        export async function handleEvent(bot: Discord.Client, event: string, events: IBotEvent[], extra?: any) {
+        export async function handleEvent(bot: Client, event: ClientEvents, events: IBotEvent[], extra?: any) {
             // Loop through all events
             for (const eventClass of events) {
                 try {
                     // Check if event class is correct event
-                    if (!(eventClass.info.event() === event)) continue;
+                    if (!(eventClass.info.getEvent() === event)) continue;
 
                     await eventClass.runEvent(bot, extra).catch((e) => { console.log(e) });
                 }
@@ -370,16 +449,26 @@ export namespace indexFunctions {
             const fs = require('fs');
 
             // Get a list of all events inside eventsFolder
-            fs.readdir(eventsPath, (err: any, files: any) => {
-                // For each file in eventsFolder, add to events variable
-                files.forEach((eventName: any) => {
-                    const eventsClass = require(`${eventsPath}/${miscFunctions.functions.replaceAll(eventName, ".js", "")}`)
+            fs.readdirSync(eventsPath).forEach((eventName: any) => {
+                const eventsClass = require(`${eventsPath}/${miscFunctions.functions.replaceAll(eventName, ".js", "")}`)
 
-                    const event = new eventsClass() as IBotEvent;
+                const event = new eventsClass() as IBotEvent;
 
-                    events.push(event);
-                });
-            })
+                events.push(event);
+            });
+        }
+
+        export function duplicateCheck(_events: IBotEvent[]): boolean {
+            let events: ClientEvents[] = [];
+            let _duplicates: ClientEvents[] = [];
+
+            for (let _event of _events) {
+                if (events.indexOf(_event.info.getEvent()) > -1) { _duplicates.push(_event.info.getEvent()); }
+                events.push(_event.info.getEvent());
+            }
+            let _checkOutcome = true;
+            if (_duplicates.length > 0) { console.log("Duplicate event types found!", _duplicates); _checkOutcome = false; }
+            return !_checkOutcome;
         }
     }
 
@@ -394,22 +483,18 @@ export namespace indexFunctions {
             //Loop through all of the commands in the config file
             const fs = require('fs');
             const dbsFolder = _dbsPath;
-
+            
             // Get a list of all commands inside commandsFolder
-            fs.readdir(dbsFolder, (err: any, files: any) => {
-                // For each file in commandsFolder, add to commands variable
-                if (!files) return;
-                files.forEach((fileName: any) => {
-                    const filePath = `${_dbsPath}/${fileName}`;
-                    if (fs.lstatSync(filePath).isDirectory()) { indexFunctions.dbs.loadDBs(filePath, _dbs); return; }
-                    
-                    const dbsClass = require(`${_dbsPath}/${miscFunctions.functions.replaceAll(fileName, ".js", "")}`)
+            fs.readdirSync(dbsFolder).forEach((fileName: any) => {
+                const filePath = `${_dbsPath}/${fileName}`;
+                if (fs.lstatSync(filePath).isDirectory()) { indexFunctions.dbs.loadDBs(filePath, _dbs); return; }
+                
+                const dbsClass = require(`${_dbsPath}/${miscFunctions.functions.replaceAll(fileName, ".js", "")}`)
 
-                    const command = new dbsClass() as IBotDB;
+                const command = new dbsClass() as IBotDB;
 
-                    _dbs.push(command);
-                });
-            })
+                _dbs.push(command);
+            });
         }
 
         /**
@@ -417,7 +502,7 @@ export namespace indexFunctions {
          * @param _commands Array list of loaded dbs.
          * @returns void
          */
-        export async function queryAllDBs(_dbs: IBotDB[], _guild?: Discord.Guild) {
+        export async function queryAllDBs(_dbs: IBotDB[], _guild?: Guild) {
 
             //Loop through all of our loaded dbs
             for (const _dbClass of _dbs) {
@@ -426,11 +511,11 @@ export namespace indexFunctions {
                 try {
                     
                     // Check if command class is correct command
-                    if (_dbClass.isGuildDB() && _guild) {
+                    if (_dbClass.info.isGuildDB() && _guild) {
                         await _dbClass.queryDB(_guild).catch((e) => { console.log(e) });
                         continue;
                     }
-                    if (_dbClass.isManual() || _dbClass.isGuildDB()) continue;
+                    if (_dbClass.info.isManual() || _dbClass.info.isGuildDB()) continue;
 
                     await _dbClass.queryDB().catch((e) => { console.log(e); });
                     continue;
@@ -448,7 +533,7 @@ export namespace indexFunctions {
          * @param _dbName Unique name of db to query.
          * @returns void
          */
-        export async function queryOneDB(_dbs: IBotDB[], _dbName: string, _guild?: Discord.Guild) {
+        export async function queryOneDB(_dbs: IBotDB[], _dbName: string, _guild?: Guild) {
             //Loop through all of our loaded dbs
             for (const _dbClass of _dbs) {
 
@@ -470,50 +555,25 @@ export namespace indexFunctions {
                 }
             }
         }
+
+        export function duplicateCheck(_dbs: IBotDB[]): boolean {
+            let _ids: string[] = [];
+            let _duplicates: string[] = [];
+
+            for (let _db of _dbs) {
+                if (_ids.indexOf(_db.info._id()) > -1) { _duplicates.push(_db.info._id()) }
+                _ids.push(_db.info._id());
+            }
+            let _checkOutcome = true;
+            if (_duplicates.length > 0) { console.log("Duplicate DB IDs found!", _duplicates); _checkOutcome = false;}
+            return !_checkOutcome;
+        }
+    }
+
+    export function runAllChecks(_commands: IBotCommand[], _elevated_commands: IBotCommand[], _events: IBotEvent[], _dbs: IBotDB[]) {
+        if (commands.duplicateCheck(_commands, _elevated_commands) || events.duplicateCheck(_events) || dbs.duplicateCheck(_dbs)) { throw new Error("Checks failed!"); }
     }
 }
-
-// namespace indexFunctions {
-//     /**
-//      * Handle Setup Command regardless of Database presence.
-//      * @param msg Message object.
-//      * @returns void
-//      */
-//     export async function handleSetup(msg: Discord.Message, bot: Discord.Client, elevated_commands: IBotCommand[]) {
-//         //Split the string into the command and all of the args
-//         let command = msg.content.split(" ")[0].substring(2).toLowerCase();
-//         let args = msg.content.split(" ").slice(1);
-
-//         //Loop through all of our loaded commands
-//         for (const commandClass of elevated_commands) {
-
-//             //Attempt to execute code but keep running incase of error
-//             try {
-                
-//                 // Check if command class is correct command
-//                 if (!(commandClass.info.command() === command)) continue;
-
-//                 await commandClass.runCommand(args, msg, bot, elevated_commands).catch((e) => { console.log(e) });
-
-//             }
-//             catch (exception) {
-//                 //If there is an error, log error exception for debug
-//                 console.log(exception);
-//             }
-//         }
-//     }
-
-//     /**
-//      * Load ALL Commands into Memory
-//      * @returns void
-//      */
-//     export function loadAllCommands(commands: IBotCommand[], elevated_commands: IBotCommand[], directory: string) {
-//         Object.keys(ConfigFile.CommandType).forEach((commandType) => {
-//             this.loadCommands(`${directory}/commands/${commandType.toString().toLowerCase()}`, commands);
-//             this.loadElevatedCommands(`${directory}/elevatedcommands/${commandType.toString().toLowerCase()}`, elevated_commands);
-//         });
-//     }
-// }
 
 export class discordUser {
     userID: string;
