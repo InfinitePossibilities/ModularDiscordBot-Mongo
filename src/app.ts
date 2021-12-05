@@ -1,4 +1,4 @@
-// Last modified: 2021/11/25 02:23:40
+// Last modified: 2021/12/05 01:40:01
 
 // APIs
 import { Client, Intents, MessageActionRow, MessageButton, ColorResolvable, ClientEvents, TextChannel } from "discord.js";
@@ -61,7 +61,7 @@ y.addListener("data", res => {
 })
 
 bot.on("ready", async() => {
-    await connect(`mongodb://${config.host}:${config.port}/${config.database}`, {useNewUrlParser: true, useUnifiedTopology: true});
+    await connect(`mongodb://${process.env.MONGO_USER}:${process.env.MONGO_PASS}@${config.host}:${config.port}/${config.database}`, {useNewUrlParser: true, useUnifiedTopology: true});
     await indexFunctions.dbs.queryAllDBs(dbs);
     console.log("Ready!")
     // if (!await miscFunctions.dbFunctions.collectionExists("Main_CoreSettings")) {
