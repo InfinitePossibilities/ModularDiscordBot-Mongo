@@ -1,6 +1,6 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
-// Last modified: 2021/12/05 01:30:48
+// Last modified: 2021/12/05 04:12:13
 const discord_js_1 = require("discord.js");
 const config_1 = require("../../config");
 const util_1 = require("../../util");
@@ -353,7 +353,7 @@ let handleArguments = async (_args, _msgObject, _client, _arguments) => {
                             },
                             boardName: _boardName
                         }]).then(async (newRecords) => {
-                        msg.edit({ content: null, embeds: [newRecords[0]] });
+                        msg.edit({ content: null, embeds: [await newRecords[0]] });
                     });
                 });
                 return;
